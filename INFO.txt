@@ -1,0 +1,22 @@
+Raw pakiet, który przychodzi z serwera
+
+
+b'2;10;400845;PaziOo;ryc%20arena%20t5%20last;140;7;0;4\x00'
+
+legenda wartości:
+
+[0] - "2" - rodzaj informacji, w tym przypadku wiadomość na czacie
+[3] - "PaziOo" - nick gracza który wysłał wiadomość
+[4] - "ryc%20arena%20t5%20last" - wiadomość, którą wysłał gracza ("%20" - spacja)
+[5] - "140" - poziom gracza
+[6] - "7" - na którym czasie wiadomość została wysłana gdzie 7 - wyprawowy, 1 - handlowy, 8 - lokalny
+
+klasy
+
+8 - sh 
+10 - łuk
+4 - mo
+3 - ryc
+7 - vd
+11 - druid
+2 - barba
