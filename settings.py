@@ -27,6 +27,7 @@ DEFAULT_SETTINGS = {
     "chat_filters": {},
     "text_filter": "",
     "autoscroll": True,
+    "menu_visible": True,
     "window_geometry": "550x300"
 }
 

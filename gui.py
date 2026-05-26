@@ -13,6 +13,7 @@ class ChatLoggerApp:
         self.theme = self.settings["theme"]
         self.chat_colors = self.settings["chat_colors"]
         self.max_messages = self.settings["max_messages"]
+        self.menu_visible = tk.BooleanVar(value=self.settings.get("menu_visible", True))
 
         self.autoscroll = tk.BooleanVar(value=self.settings.get("autoscroll", True))
 
@@ -29,6 +30,7 @@ class ChatLoggerApp:
             chat: var.get() for chat, var in self.chat_filters.items()
         }
         self.settings["text_filter"] = self.filter_entry.get()
+        self.settings["menu_visible"] = self.menu_visible.get()
         self.settings["window_geometry"] = self.root.geometry()
         save_settings(self.settings)
 
@@ -49,6 +51,18 @@ class ChatLoggerApp:
         self._geometry_save_job = None
         self.save_settings()
 
+    def toggle_menu(self):
+        self.menu_visible.set(not self.menu_visible.get())
+
+        if self.menu_visible.get():
+            self.left_panel.pack(side=tk.LEFT, fill=tk.Y, before=self.right_panel)
+            self.menu_toggle.config(text="<")
+        else:
+            self.left_panel.pack_forget()
+            self.menu_toggle.config(text=">")
+
+        self.save_settings()
+
     # =========================
     # GUI
     # =========================
@@ -59,12 +73,28 @@ class ChatLoggerApp:
         self.root.attributes("-topmost", True)
         self.root.bind("<Configure>", self._schedule_geometry_save)
 
-        left = tk.Frame(self.root, bg=self.theme["bg"], width=200)
-        left.pack(side=tk.LEFT, fill=tk.Y)
+        self.toggle_bar = tk.Frame(self.root, bg=self.theme["bg"])
+        self.toggle_bar.pack(side=tk.LEFT, fill=tk.Y)
+
+        self.menu_toggle = tk.Button(
+            self.toggle_bar,
+            text="<" if self.menu_visible.get() else ">",
+            width=2,
+            bg=self.theme["entry_bg"],
+            fg=self.theme["fg"],
+            activebackground=self.theme["bg"],
+            activeforeground=self.theme["fg"],
+            command=self.toggle_menu
+        )
+        self.menu_toggle.pack(fill=tk.Y)
+
+        self.left_panel = tk.Frame(self.root, bg=self.theme["bg"], width=200)
+        if self.menu_visible.get():
+            self.left_panel.pack(side=tk.LEFT, fill=tk.Y)
 
         for chat, var in self.chat_filters.items():
             tk.Checkbutton(
-                left,
+                self.left_panel,
                 text=chat,
                 variable=var,
                 bg=self.theme["bg"],
@@ -75,16 +105,16 @@ class ChatLoggerApp:
                 command=self._update_filters
             ).pack(anchor=tk.W)
 
-        self.filter_entry = tk.Entry(left, bg=self.theme["entry_bg"], fg=self.theme["fg"])
+        self.filter_entry = tk.Entry(self.left_panel, bg=self.theme["entry_bg"], fg=self.theme["fg"])
         self.filter_entry.pack(fill=tk.X)
         self.filter_entry.insert(0, self.settings.get("text_filter", ""))
         self.filter_entry.bind("<KeyRelease>", lambda e: self._update_filters())
 
-        right = tk.Frame(self.root, bg=self.theme["bg"])
-        right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        self.right_panel = tk.Frame(self.root, bg=self.theme["bg"])
+        self.right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
         self.textbox = tk.Text(
-            right,
+            self.right_panel,
             bg=self.theme["text_bg"],
             fg=self.theme["fg"],
             wrap=tk.WORD,
@@ -95,7 +125,7 @@ class ChatLoggerApp:
 
 
         tk.Button(
-            left,
+            self.left_panel,
             text="Clear",
             bg=self.theme["entry_bg"],
             fg=self.theme["fg"],
@@ -103,7 +133,7 @@ class ChatLoggerApp:
         ).pack(fill=tk.X, pady=0)
 
         tk.Checkbutton(
-            left,
+            self.left_panel,
             text="Auto-scroll",
             variable=self.autoscroll,
             bg=self.theme["bg"],
