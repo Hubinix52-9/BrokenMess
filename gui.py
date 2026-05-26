@@ -1,8 +1,5 @@
-import json
-import os
-from pathlib import Path
 import tkinter as tk
-from config import MAX_MESSAGES, BG, FG, ENTRY_BG, TEXT_BG, CHAT_COLORS
+from settings import get_settings_path, load_settings, save_settings
 
 
 class ChatLoggerApp:
@@ -10,66 +7,59 @@ class ChatLoggerApp:
         self.root = root
 
         self.messages = []
-        self.settings_path = self._get_settings_path()
-        self.settings = self._load_settings()
+        self.settings_path = get_settings_path()
+        self.settings = load_settings()
+        self._geometry_save_job = None
+        self.theme = self.settings["theme"]
+        self.chat_colors = self.settings["chat_colors"]
+        self.max_messages = self.settings["max_messages"]
 
         self.autoscroll = tk.BooleanVar(value=self.settings.get("autoscroll", True))
 
         self.chat_filters = {
             k: tk.BooleanVar(value=self.settings.get("chat_filters", {}).get(k, True))
-            for k in CHAT_COLORS
+            for k in self.chat_colors
         }
 
         self._build_gui()
 
-    def _get_settings_path(self):
-        config_dir = os.getenv("APPDATA")
-        if config_dir:
-            return Path(config_dir) / "BrokenMess" / "settings.json"
-        return Path.home() / ".brokenmess_settings.json"
-
-    def _load_settings(self):
-        try:
-            with self.settings_path.open("r", encoding="utf-8") as settings_file:
-                data = json.load(settings_file)
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            return {}
-
-        if not isinstance(data, dict):
-            return {}
-
-        return data
-
     def save_settings(self):
-        data = {
-            "autoscroll": self.autoscroll.get(),
-            "chat_filters": {
-                chat: var.get() for chat, var in self.chat_filters.items()
-            },
-            "text_filter": self.filter_entry.get()
+        self.settings["autoscroll"] = self.autoscroll.get()
+        self.settings["chat_filters"] = {
+            chat: var.get() for chat, var in self.chat_filters.items()
         }
-
-        try:
-            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
-            with self.settings_path.open("w", encoding="utf-8") as settings_file:
-                json.dump(data, settings_file, ensure_ascii=False, indent=2)
-        except OSError:
-            pass
+        self.settings["text_filter"] = self.filter_entry.get()
+        self.settings["window_geometry"] = self.root.geometry()
+        save_settings(self.settings)
 
     def _update_filters(self):
         self.save_settings()
         self.refresh_view()
+
+    def _schedule_geometry_save(self, event):
+        if event.widget is not self.root:
+            return
+
+        if self._geometry_save_job is not None:
+            self.root.after_cancel(self._geometry_save_job)
+
+        self._geometry_save_job = self.root.after(300, self._save_geometry)
+
+    def _save_geometry(self):
+        self._geometry_save_job = None
+        self.save_settings()
 
     # =========================
     # GUI
     # =========================
     def _build_gui(self):
         self.root.title("BrokenMess")
-        self.root.geometry("550x300")
+        self.root.geometry(self.settings.get("window_geometry", "550x300"))
         self.root.attributes("-alpha", 0.85)
         self.root.attributes("-topmost", True)
+        self.root.bind("<Configure>", self._schedule_geometry_save)
 
-        left = tk.Frame(self.root, bg=BG, width=200)
+        left = tk.Frame(self.root, bg=self.theme["bg"], width=200)
         left.pack(side=tk.LEFT, fill=tk.Y)
 
         for chat, var in self.chat_filters.items():
@@ -77,26 +67,26 @@ class ChatLoggerApp:
                 left,
                 text=chat,
                 variable=var,
-                bg=BG,
-                fg=CHAT_COLORS[chat],
-                selectcolor=BG,
-                activebackground=BG,
-                activeforeground=CHAT_COLORS[chat],
+                bg=self.theme["bg"],
+                fg=self.chat_colors[chat],
+                selectcolor=self.theme["bg"],
+                activebackground=self.theme["bg"],
+                activeforeground=self.chat_colors[chat],
                 command=self._update_filters
             ).pack(anchor=tk.W)
 
-        self.filter_entry = tk.Entry(left, bg=ENTRY_BG, fg=FG)
+        self.filter_entry = tk.Entry(left, bg=self.theme["entry_bg"], fg=self.theme["fg"])
         self.filter_entry.pack(fill=tk.X)
         self.filter_entry.insert(0, self.settings.get("text_filter", ""))
         self.filter_entry.bind("<KeyRelease>", lambda e: self._update_filters())
 
-        right = tk.Frame(self.root, bg=BG)
+        right = tk.Frame(self.root, bg=self.theme["bg"])
         right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
         self.textbox = tk.Text(
             right,
-            bg=TEXT_BG,
-            fg=FG,
+            bg=self.theme["text_bg"],
+            fg=self.theme["fg"],
             wrap=tk.WORD,
             state=tk.DISABLED,
             bd=0
@@ -104,25 +94,31 @@ class ChatLoggerApp:
         self.textbox.pack(fill=tk.BOTH, expand=True)
 
 
-        tk.Button(left, text="Clear", bg=ENTRY_BG, fg=FG, command=self.clear_messages).pack(fill=tk.X, pady=0)
+        tk.Button(
+            left,
+            text="Clear",
+            bg=self.theme["entry_bg"],
+            fg=self.theme["fg"],
+            command=self.clear_messages
+        ).pack(fill=tk.X, pady=0)
 
         tk.Checkbutton(
             left,
             text="Auto-scroll",
             variable=self.autoscroll,
-            bg=BG,
-            fg=FG,
-            selectcolor=BG,
-            activebackground=BG,
-            activeforeground=FG,
+            bg=self.theme["bg"],
+            fg=self.theme["fg"],
+            selectcolor=self.theme["bg"],
+            activebackground=self.theme["bg"],
+            activeforeground=self.theme["fg"],
             command=self._update_filters
         ).pack(anchor=tk.W, pady=(5, 0))
  
 
-        for chat, color in CHAT_COLORS.items():
+        for chat, color in self.chat_colors.items():
             self.textbox.tag_config(chat, foreground=color)
 
-        self.textbox.tag_config("meta", foreground="#00ff00")
+        self.textbox.tag_config("meta", foreground=self.theme["meta_fg"])
 
     # =========================
     # MESSAGE HANDLING
@@ -130,7 +126,7 @@ class ChatLoggerApp:
     def add_message(self, msg):
         self.messages.append(msg)
 
-        if len(self.messages) > MAX_MESSAGES:
+        if len(self.messages) > self.max_messages:
             removed = self.messages.pop(0)
 
             if self._passes_filters(removed):
