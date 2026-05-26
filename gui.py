@@ -1,3 +1,6 @@
+import json
+import os
+from pathlib import Path
 import tkinter as tk
 from config import MAX_MESSAGES, BG, FG, ENTRY_BG, TEXT_BG, CHAT_COLORS
 
@@ -7,13 +10,55 @@ class ChatLoggerApp:
         self.root = root
 
         self.messages = []
-        self.autoscroll = tk.BooleanVar(value=True)
+        self.settings_path = self._get_settings_path()
+        self.settings = self._load_settings()
+
+        self.autoscroll = tk.BooleanVar(value=self.settings.get("autoscroll", True))
 
         self.chat_filters = {
-            k: tk.BooleanVar(value=True) for k in CHAT_COLORS
+            k: tk.BooleanVar(value=self.settings.get("chat_filters", {}).get(k, True))
+            for k in CHAT_COLORS
         }
 
         self._build_gui()
+
+    def _get_settings_path(self):
+        config_dir = os.getenv("APPDATA")
+        if config_dir:
+            return Path(config_dir) / "BrokenMess" / "settings.json"
+        return Path.home() / ".brokenmess_settings.json"
+
+    def _load_settings(self):
+        try:
+            with self.settings_path.open("r", encoding="utf-8") as settings_file:
+                data = json.load(settings_file)
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return {}
+
+        if not isinstance(data, dict):
+            return {}
+
+        return data
+
+    def save_settings(self):
+        data = {
+            "autoscroll": self.autoscroll.get(),
+            "chat_filters": {
+                chat: var.get() for chat, var in self.chat_filters.items()
+            },
+            "text_filter": self.filter_entry.get()
+        }
+
+        try:
+            self.settings_path.parent.mkdir(parents=True, exist_ok=True)
+            with self.settings_path.open("w", encoding="utf-8") as settings_file:
+                json.dump(data, settings_file, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+
+    def _update_filters(self):
+        self.save_settings()
+        self.refresh_view()
 
     # =========================
     # GUI
@@ -35,12 +80,15 @@ class ChatLoggerApp:
                 bg=BG,
                 fg=CHAT_COLORS[chat],
                 selectcolor=BG,
-                command=self.refresh_view
+                activebackground=BG,
+                activeforeground=CHAT_COLORS[chat],
+                command=self._update_filters
             ).pack(anchor=tk.W)
 
         self.filter_entry = tk.Entry(left, bg=ENTRY_BG, fg=FG)
         self.filter_entry.pack(fill=tk.X)
-        self.filter_entry.bind("<KeyRelease>", lambda e: self.refresh_view())
+        self.filter_entry.insert(0, self.settings.get("text_filter", ""))
+        self.filter_entry.bind("<KeyRelease>", lambda e: self._update_filters())
 
         right = tk.Frame(self.root, bg=BG)
         right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -67,7 +115,7 @@ class ChatLoggerApp:
             selectcolor=BG,
             activebackground=BG,
             activeforeground=FG,
-            command=lambda: self.refresh_view(reason="filter")
+            command=self._update_filters
         ).pack(anchor=tk.W, pady=(5, 0))
  
 
@@ -104,7 +152,7 @@ class ChatLoggerApp:
         if self.autoscroll.get():
             self.textbox.see(tk.END)
 
-    def refresh_view(self):
+    def refresh_view(self, *args, **kwargs):
         self.textbox.config(state=tk.NORMAL)
         self.textbox.delete("1.0", tk.END)
 

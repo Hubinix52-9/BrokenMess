@@ -27,6 +27,7 @@ def main():
             return
 
         def on_closing():
+            app.save_settings()
             sniffer.stop()
             root.destroy()
 
