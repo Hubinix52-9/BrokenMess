@@ -99,10 +99,10 @@ class ChatLoggerApp:
         self.textbox.insert(tk.END, meta, "meta")
         self.textbox.insert(tk.END, msg["text"] + "\n", msg["chat"])
 
+        self.textbox.config(state=tk.DISABLED)
+        
         if self.autoscroll.get():
             self.textbox.see(tk.END)
-
-        self.textbox.config(state=tk.DISABLED)
 
     def refresh_view(self):
         self.textbox.config(state=tk.NORMAL)
@@ -110,9 +110,14 @@ class ChatLoggerApp:
 
         for msg in self.messages:
             if self._passes_filters(msg):
-                self._append(msg)
+                meta = f'{msg["player"]} {msg["level"]} {msg["class"]} - '
+                self.textbox.insert(tk.END, meta, "meta")
+                self.textbox.insert(tk.END, msg["text"] + "\n", msg["chat"])
 
         self.textbox.config(state=tk.DISABLED)
+        
+        if self.autoscroll.get():
+            self.textbox.see(tk.END)
 
     def clear_messages(self):
         self.messages.clear()
