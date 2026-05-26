@@ -2,7 +2,7 @@
 
 import threading
 import logging
-from scapy.all import sniff, UDP
+from scapy.all import sniff, TCP
 from parser import parse_message
 from config import SERVER_IP
 
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class PacketSniffer:
-    """Sniffs UDP packets and parses game chat messages"""
+    """Sniffs TCP packets and parses game chat messages"""
     
     def __init__(self, callback, server_ip=SERVER_IP, debug=False):
         """Initialize sniffer
@@ -18,7 +18,7 @@ class PacketSniffer:
         Args:
             callback: Function to call with parsed message dict
             server_ip: IP address to filter packets from
-            debug: Enable debug logging of all UDP packets
+            debug: Enable debug logging of all TCP packets
         """
         self.callback = callback
         self.server_ip = server_ip
@@ -34,22 +34,18 @@ class PacketSniffer:
     def _packet_handler(self, packet):
         """Process incoming packet"""
         try:
-            # Check if packet has UDP layer
-            if not packet.haslayer(UDP):
+            # Check if packet has TCP layer
+            if not packet.haslayer(TCP):
                 return
             
             self.stats['total_packets'] += 1
             
-            # Skip DNS queries/responses
-            if packet[UDP].sport == 53 or packet[UDP].dport == 53:
-                return
-            
             # Extract raw payload
-            raw_payload = bytes(packet[UDP].payload)
+            raw_payload = bytes(packet[TCP].payload)
             
             if self.debug:
                 src_ip = packet[1].src if len(packet) > 1 else "?"
-                src_port = packet[UDP].sport
+                src_port = packet[TCP].sport
                 payload_len = len(raw_payload)
                 logger.info(f"[PKT] {src_ip}:{src_port} -> {payload_len} bytes")
                 if payload_len < 200:
@@ -98,7 +94,7 @@ class PacketSniffer:
             # Try filtering by IP first
             sniff(
                 prn=self._packet_handler,
-                filter=f"udp and host {self.server_ip}",
+                filter=f"tcp and host {self.server_ip}",
                 store=False,
                 stop_filter=lambda x: not self.running
             )
