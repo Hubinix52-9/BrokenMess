@@ -203,7 +203,12 @@ class ChatLoggerApp:
 
         text_filter = self.filter_entry.get().lower()
         if text_filter:
+            terms = [
+                term.strip()
+                for term in text_filter.split("&")
+                if term.strip()
+            ]
             combined = f'{msg["player"]} {msg["text"]}'.lower()
-            return text_filter in combined
+            return any(term in combined for term in terms)
 
         return True
